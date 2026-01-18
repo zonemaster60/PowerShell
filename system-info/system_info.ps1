@@ -1,3 +1,4 @@
+[CmdletBinding()]
 param(
   # Default output saves next to this script.
   [string]$OutFile,
@@ -23,10 +24,35 @@ param(
   [string]$DriverDeviceNameLike
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = 'SilentlyContinue'
 
 function Get-OsSoftwareInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-OsSoftwareInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-OsSoftwareInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-OsSoftwareInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $os = Get-CimInstance Win32_OperatingSystem
   $cs = Get-CimInstance Win32_ComputerSystem
 
@@ -45,6 +71,32 @@ function Get-OsSoftwareInfo {
 }
 
 function Get-HardwareInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-HardwareInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-HardwareInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-HardwareInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
   $bios = Get-CimInstance Win32_BIOS | Select-Object -First 1
   $mem = Get-CimInstance Win32_PhysicalMemory
@@ -93,6 +145,32 @@ function Get-HardwareInfo {
 }
 
 function Get-NetworkInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-NetworkInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-NetworkInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-NetworkInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $adapters = Get-NetAdapter | Sort-Object -Property Status, Name
   $ip = Get-NetIPAddress |
     Where-Object { $_.AddressFamily -in @("IPv4", "IPv6") } |
@@ -106,7 +184,7 @@ function Get-NetworkInfo {
           InterfaceDescription = $_.InterfaceDescription
           Status               = $_.Status
           MacAddress           = $_.MacAddress
-          LinkSpeed            = "$($_.LinkSpeed)"
+          LinkSpeed            = ('{0}' -f $_.LinkSpeed)
         }
       })
     IPAddresses = @($ip | ForEach-Object {
@@ -138,6 +216,32 @@ function Get-NetworkInfo {
 }
 
 function Get-InternetInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-InternetInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-InternetInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-InternetInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $pingTarget = "1.1.1.1"
   $dnsTarget = "www.microsoft.com"
 
@@ -154,6 +258,32 @@ function Get-InternetInfo {
 }
 
 function Get-DevicesInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-DevicesInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-DevicesInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-DevicesInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $pnp = Get-PnpDevice | Sort-Object -Property Class, FriendlyName
 
   if ($DeviceClass) {
@@ -179,6 +309,32 @@ function Get-DevicesInfo {
 }
 
 function Get-DriversInfo {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Get-DriversInfo" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Get-DriversInfo
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Get-DriversInfo
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   $signed = Get-CimInstance Win32_PnPSignedDriver |
     Sort-Object -Property DriverProviderName, DeviceName
 
@@ -221,15 +377,77 @@ $report = [pscustomobject]@{
   Drivers  = Get-DriversInfo
 }
 
-function Write-Section([string]$Title) {
+function Write-Section {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Write-Section" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .PARAMETER Title
+      Describe parameter -Title.
+
+      .EXAMPLE
+      Write-Section -Title Value
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Write-Section
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
+  
+  [CmdletBinding()]
+  param
+  (
+    [string]
+    $Title
+  )
   Write-Host ""
-  Write-Host "=== $Title ===" -ForegroundColor Cyan
+  Write-Host ('=== {0} ===' -f $Title) -ForegroundColor Cyan
 }
 
 function Pause-BeforeSave {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Pause-BeforeSave" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .EXAMPLE
+      Pause-BeforeSave
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Pause-BeforeSave
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   Write-Host ""
   Write-Host "Review the info above." -ForegroundColor Yellow
-  Write-Host "Press any key to save JSON to: $OutFile" -ForegroundColor Yellow
+  Write-Host ('Press any key to save JSON to: {0}' -f $OutFile) -ForegroundColor Yellow
 
   try {
     if ($Host.UI -and $Host.UI.RawUI) {
@@ -237,7 +455,21 @@ function Pause-BeforeSave {
       return
     }
   } catch {
-    # fall back below
+      # get error record
+      [Management.Automation.ErrorRecord]$e = $_
+
+      # retrieve information about runtime error
+      $info = [PSCustomObject]@{
+        Exception = $e.Exception.Message
+        Reason    = $e.CategoryInfo.Reason
+        Target    = $e.CategoryInfo.TargetName
+        Script    = $e.InvocationInfo.ScriptName
+        Line      = $e.InvocationInfo.ScriptLineNumber
+        Column    = $e.InvocationInfo.OffsetInLine
+      }
+      
+      # output information. Post-process collected info, and log info (optional)
+      $info
   }
 
   # Fallback for hosts without RawUI support.
@@ -245,9 +477,44 @@ function Pause-BeforeSave {
 }
 
 function Write-PagedTable {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Write-PagedTable" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .PARAMETER InputObject
+      Describe parameter -InputObject.
+
+      .PARAMETER PageSize
+      Describe parameter -PageSize.
+
+      .PARAMETER DisablePaging
+      Describe parameter -DisablePaging.
+
+      .EXAMPLE
+      Write-PagedTable -InputObject Value -PageSize Value -DisablePaging
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Write-PagedTable
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
   param(
     [Parameter(Mandatory = $true)]
-    $InputObject,
+    [Object]$InputObject,
 
     [int]$PageSize = 35,
 
@@ -290,8 +557,8 @@ function Write-PagedTable {
 # Display summary on screen
 Clear-Host
 Write-Host "System Info Report" -ForegroundColor Green
-Write-Host "Generated: $($report.Meta.Timestamp)" -ForegroundColor DarkGray
-Write-Host "Elevated:  $($report.Meta.Elevated)" -ForegroundColor DarkGray
+Write-Host ('Generated: {0}' -f $report.Meta.Timestamp) -ForegroundColor DarkGray
+Write-Host ('Elevated:  {0}' -f $report.Meta.Elevated) -ForegroundColor DarkGray
 
 Write-Section "Software"
 $report.Software | Format-List | Out-String | Write-Host
@@ -299,7 +566,7 @@ $report.Software | Format-List | Out-String | Write-Host
 Write-Section "Hardware"
 $report.Hardware.CPU | Format-List | Out-String | Write-Host
 $report.Hardware.BIOS | Format-List | Out-String | Write-Host
-$report.Hardware.Memory | Select-Object TotalGB | Format-List | Out-String | Write-Host
+$report.Hardware.Memory | Select-Object -ExpandProperty TotalGB | Format-List | Out-String | Write-Host
 Write-Host "Disks:" -ForegroundColor DarkGray
 $report.Hardware.Disks | Format-Table -AutoSize | Out-String | Write-Host
 
@@ -337,7 +604,7 @@ try {
   $resolvedOutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
 } catch {
   try {
-    $resolvedOutFile = [System.IO.Path]::GetFullPath($OutFile)
+    $resolvedOutFile = [IO.Path]::GetFullPath($OutFile)
   } catch {
     $resolvedOutFile = $OutFile
   }
@@ -345,8 +612,32 @@ try {
 
 try {
   $json | Out-File -FilePath $resolvedOutFile -Encoding utf8 -Force
-  Write-Host "Saved: $resolvedOutFile" -ForegroundColor Green
+  Write-Host ('Saved: {0}' -f $resolvedOutFile) -ForegroundColor Green
 } catch {
-  Write-Host "Failed to save: $resolvedOutFile" -ForegroundColor Red
+  Write-Host ('Failed to save: {0}' -f $resolvedOutFile) -ForegroundColor Red
   Write-Host $_.Exception.Message -ForegroundColor Red
 }
+
+# SIG # Begin signature block
+# MIID4QYJKoZIhvcNAQcCoIID0jCCA84CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUw04rx/RT3NKKhUQn+0nDcitV
+# wqmgggH/MIIB+zCCAWSgAwIBAgIQK8KPnyZqh7ZLgu5QUg7L1TANBgkqhkiG9w0B
+# AQUFADAYMRYwFAYDVQQDDA1EYXZpZCBTY291dGVuMB4XDTI2MDExNzE0MTcyM1oX
+# DTMwMDExNzAwMDAwMFowGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbjCBnzANBgkq
+# hkiG9w0BAQEFAAOBjQAwgYkCgYEAuixS48kf0xGGzx74Y45fjPFNwvOudmeITTBN
+# FJVdCxYJ1J6Mym5fj2oIkPr2LEJn8Z9SDDaNunk6DPRgHvbHuKfpBbvwNcYz17Xi
+# ll2A2cudyMGf61ourjQJIwvmhyYD3mv8tBRA7cu0jCPcJgfZaoPxi9foJlOJAZkp
+# hWLUtSECAwEAAaNGMEQwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYDVR0OBBYEFLB3
+# VS+syNCZjA1TABGZWX/r9DisMA4GA1UdDwEB/wQEAwIHgDANBgkqhkiG9w0BAQUF
+# AAOBgQCqQdqfPWwwDvuTu3+xFp1nc2HUGCYiQFvrMwHcjjwY5YquK2ebkhsbX7gn
+# x47StrKakOaBZzqe5TtpbcuNVq24vb/MgJX48ImwH8VUAM/Ov++HdJyA5QUZpGNk
+# qLr4aBGs6ACVmKgOZdaJqI4d29lUSdwq7gbRdUsuzluwg0x/iTGCAUwwggFIAgEB
+# MCwwGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbgIQK8KPnyZqh7ZLgu5QUg7L1TAJ
+# BgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAigAoAAoQKAADAZBgkqhkiG9w0B
+# CQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgELMQ4wDAYKKwYBBAGCNwIBFTAj
+# BgkqhkiG9w0BCQQxFgQUv2Z8otKh5AVFNNitjroOntvw5xowDQYJKoZIhvcNAQEB
+# BQAEgYAugBA0gVe7GQ4Xu35kFUDaa1f56yW9KOS2+XrreMGHFTfoDUcVTbUm/sXG
+# RZqdsdO8x8+jPYjTU4QngFiWoBtC0fmAbbJNu9EQ+KVt9zXrnzsmbuIQEpWAYpvt
+# N0hyG44jKs6AjLKLh1KQLRawiQ7AcEK9JUqqz+zTY/AWd/vgOw==
+# SIG # End signature block
