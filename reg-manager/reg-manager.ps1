@@ -8,6 +8,8 @@ $ErrorActionPreference = 'Stop'
 # =========================
 
 $Script:ProgramVersion = '1.0.0.0'
+$Script:ProgramName = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { 'reg-backup.ps1' }
+$Script:ProgramBaseName = [IO.Path]::GetFileNameWithoutExtension($Script:ProgramName)
 
 function Test-IsAdmin {
   <#
@@ -68,9 +70,17 @@ function Get-RegExePath {
   #>
 
 
-    $p = Join-Path $env:WINDIR 'System32\reg.exe'
-    if (-not (Test-Path -LiteralPath $p)) { throw ('reg.exe not found at: {0}' -f $p) }
-    return $p
+    # Avoid WOW64 registry redirection when running 32-bit PowerShell on 64-bit Windows
+    $windir = $env:WINDIR
+    $sysnative = Join-Path $windir 'sysnative\reg.exe'
+    $system32 = Join-Path $windir 'System32\reg.exe'
+
+    if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess -and (Test-Path -LiteralPath $sysnative)) {
+        return $sysnative
+    }
+
+    if (-not (Test-Path -LiteralPath $system32)) { throw ('reg.exe not found at: {0}' -f $system32) }
+    return $system32
 }
 
 function Get-ScriptDir {
@@ -134,9 +144,47 @@ function Ensure-Folder([string]$Path) {
   #>
 
 
+    if ([string]::IsNullOrWhiteSpace($Path)) { return }
     if (-not (Test-Path -LiteralPath $Path)) {
-        $null = New-Item -ItemType Directory -Path $Path
+        $null = New-Item -ItemType Directory -Path -LiteralPath $Path -Force
     }
+}
+
+function Quote-CmdArg([string]$Value) {
+  <#
+      .SYNOPSIS
+      Describe purpose of "Quote-CmdArg" in 1-2 sentences.
+
+      .DESCRIPTION
+      Add a more complete description of what the function does.
+
+      .PARAMETER Value
+      Describe parameter -Value.
+
+      .EXAMPLE
+      Quote-CmdArg -Value Value
+      Describe what this call does
+
+      .NOTES
+      Place additional notes here.
+
+      .LINK
+      URLs to related sites
+      The first link is opened by Get-Help -Online Quote-CmdArg
+
+      .INPUTS
+      List of input types that are accepted by this function.
+
+      .OUTPUTS
+      List of output types produced by this function.
+  #>
+
+
+    if ($null -eq $Value) { return '""' }
+    if ($Value -match '[\s"]') {
+        return '"' + ($Value -replace '"', '\\"') + '"'
+    }
+    return $Value
 }
 
 function Write-Header([string]$Title) {
@@ -385,7 +433,7 @@ function ConvertTo-RegExeKey([string]$KeyPath) {
         '^HKEY_LOCAL_MACHINE' { $k = $k -replace '^HKEY_LOCAL_MACHINE', 'HKLM' }
         '^HKEY_CURRENT_USER'  { $k = $k -replace '^HKEY_CURRENT_USER',  'HKCU' }
         '^HKEY_CLASSES_ROOT'  { $k = $k -replace '^HKEY_CLASSES_ROOT',  'HKCR' }
-        '^HKEY_USERS'         { $k = $k -replace '^HKEY_USERS',         'HKU'  }
+        '^HKEY_USERS'       { $k = $k -replace '^HKEY_USERS',         'HKU' }
         '^HKEY_CURRENT_CONFIG'{ $k = $k -replace '^HKEY_CURRENT_CONFIG', 'HKCC' }
     }
 
@@ -498,7 +546,7 @@ function Start-Log([string]$LogPath) {
 
 
     Ensure-Folder (Split-Path -Parent $LogPath)
-    "Log started: $(Get-Date -Format o)" | Out-File -LiteralPath $LogPath -Encoding ASCII
+    "Log started: $(Get-Date -Format o)" | Out-File -LiteralPath $LogPath -Encoding UTF8
 }
 
 function Write-Log([string]$LogPath, [string]$Message) {
@@ -535,7 +583,7 @@ function Write-Log([string]$LogPath, [string]$Message) {
 
 
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
-    $line | Out-File -LiteralPath $LogPath -Append -Encoding ASCII
+    $line | Out-File -LiteralPath $LogPath -Append -Encoding UTF8
 }
 
 function Get-DefaultConfig {
@@ -601,7 +649,12 @@ function Get-ConfigPath {
 
 
     $dir = Get-ScriptDir
-    return (Join-Path $dir 'RegistryBackupRestore.config.json')
+    $new = Join-Path $dir ("{0}.config.json" -f $Script:ProgramBaseName)
+    $legacy = Join-Path $dir 'RegistryBackupRestore.config.json'
+
+    # Back-compat: read legacy config if present and new file doesn't exist yet
+    if ((Test-Path -LiteralPath $legacy) -and -not (Test-Path -LiteralPath $new)) { return $legacy }
+    return $new
 }
 
 function Load-Config {
@@ -636,7 +689,7 @@ function Load-Config {
     if (-not (Test-Path -LiteralPath $p)) { return $d }
 
     try {
-        $raw = Get-Content -LiteralPath $p -Raw -Encoding ASCII
+        $raw = Get-Content -LiteralPath $p -Raw -Encoding UTF8
         $o = $raw | ConvertFrom-Json
 
         # Merge defaults
@@ -685,7 +738,7 @@ function Save-Config([hashtable]$Config) {
 
 
     $p = Get-ConfigPath
-    $Config | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $p -Encoding ASCII
+    $Config | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $p -Encoding UTF8
 }
 
 function New-BackupSession([hashtable]$Config, [string]$Label) {
@@ -791,10 +844,11 @@ function Export-RegistryKey {
 
     Ensure-Folder (Split-Path -Parent $OutFile)
 
-    $args = @('export', $key, $OutFile, '/y')
-    Write-Log $LogPath ("EXPORT: reg.exe {0}" -f ($args -join ' '))
+    # Windows PowerShell 5.1: Start-Process -ArgumentList is a string; build a correctly-quoted command line.
+    $argString = ('export {0} {1} /y' -f (Quote-CmdArg $key), (Quote-CmdArg $OutFile))
+    Write-Log $LogPath ("EXPORT: reg.exe {0}" -f $argString)
 
-    $p = Start-Process -FilePath $reg -ArgumentList $args -Wait -NoNewWindow -PassThru
+    $p = Start-Process -FilePath $reg -ArgumentList $argString -Wait -NoNewWindow -PassThru
     if ($p.ExitCode -ne 0) {
         throw ('Export failed (exit code {0}) for key: {1}' -f $p.ExitCode, $key)
     }
@@ -841,10 +895,11 @@ function Import-RegistryFile {
     $reg = Get-RegExePath
     if (-not (Test-Path -LiteralPath $RegFile)) { throw ('REG file not found: {0}' -f $RegFile) }
 
-    $args = @('import', $RegFile)
-    Write-Log $LogPath ("IMPORT: reg.exe {0}" -f ($args -join ' '))
+    # Windows PowerShell 5.1: Start-Process -ArgumentList is a string; build a correctly-quoted command line.
+    $argString = ('import {0}' -f (Quote-CmdArg $RegFile))
+    Write-Log $LogPath ("IMPORT: reg.exe {0}" -f $argString)
 
-    $p = Start-Process -FilePath $reg -ArgumentList $args -Wait -NoNewWindow -PassThru
+    $p = Start-Process -FilePath $reg -ArgumentList $argString -Wait -NoNewWindow -PassThru
     if ($p.ExitCode -ne 0) {
         throw ('Import failed (exit code {0}) for file: {1}' -f $p.ExitCode, $RegFile)
     }
@@ -896,7 +951,7 @@ function Build-ManifestObject {
     $os = Get-CimInstance Win32_OperatingSystem
 
     return [ordered]@{
-        Program = 'RegistryBackupRestore.ps1'
+        Program = $Script:ProgramName
         ProgramVersion = $Script:ProgramVersion
         CreatedAt = (Get-Date).ToString('o')
         ComputerName = $env:COMPUTERNAME
@@ -950,7 +1005,7 @@ function Write-Manifest([hashtable]$Manifest, [string]$Path) {
   #>
 
 
-    $Manifest | ConvertTo-Json -Depth 8 | Out-File -LiteralPath $Path -Encoding ASCII
+    $Manifest | ConvertTo-Json -Depth 8 | Out-File -LiteralPath $Path -Encoding UTF8
 }
 
 function Get-BackupFolders([hashtable]$Config) {
@@ -1138,7 +1193,7 @@ function Try-CreateRestorePoint([string]$LogPath) {
 
 
     try {
-        $null = Checkpoint-Computer -Description "Registry restore (RegistryBackupRestore.ps1)" -RestorePointType "MODIFY_SETTINGS"
+        $null = Checkpoint-Computer -Description ("Registry restore ({0})" -f $Script:ProgramBaseName) -RestorePointType "MODIFY_SETTINGS"
         Write-Log $LogPath "Created system restore point."
         return $true
     } catch {
@@ -1339,7 +1394,7 @@ function Verify-BackupManifest([string]$ManifestPath) {
 
 
     if (-not (Test-Path -LiteralPath $ManifestPath)) { throw ('Manifest not found: {0}' -f $ManifestPath) }
-    $raw = Get-Content -LiteralPath $ManifestPath -Raw -Encoding ASCII
+    $raw = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8
     $m = $raw | ConvertFrom-Json
 
     $base = Split-Path -Parent $ManifestPath
@@ -1410,7 +1465,7 @@ function Restore-FromManifest([string]$ManifestPath) {
     $logPath = Join-Path $base 'restore.log'
     Start-Log $logPath
 
-    $raw = Get-Content -LiteralPath $ManifestPath -Raw -Encoding ASCII
+    $raw = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8
     $m = $raw | ConvertFrom-Json
 
     Write-Header "Registry Restore"
@@ -1952,8 +2007,8 @@ Main
 # SIG # Begin signature block
 # MIID4QYJKoZIhvcNAQcCoIID0jCCA84CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUiZT+iALWnZNvbLhtYOQmUBze
-# B+CgggH/MIIB+zCCAWSgAwIBAgIQK8KPnyZqh7ZLgu5QUg7L1TANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUmX8BLz9ydthzMmHzQTyN/mZq
+# WOagggH/MIIB+zCCAWSgAwIBAgIQK8KPnyZqh7ZLgu5QUg7L1TANBgkqhkiG9w0B
 # AQUFADAYMRYwFAYDVQQDDA1EYXZpZCBTY291dGVuMB4XDTI2MDExNzE0MTcyM1oX
 # DTMwMDExNzAwMDAwMFowGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbjCBnzANBgkq
 # hkiG9w0BAQEFAAOBjQAwgYkCgYEAuixS48kf0xGGzx74Y45fjPFNwvOudmeITTBN
@@ -1967,8 +2022,8 @@ Main
 # MCwwGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbgIQK8KPnyZqh7ZLgu5QUg7L1TAJ
 # BgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAigAoAAoQKAADAZBgkqhkiG9w0B
 # CQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgELMQ4wDAYKKwYBBAGCNwIBFTAj
-# BgkqhkiG9w0BCQQxFgQUj6oYnZ3b2mMB3PWxGvQoMiOXEKMwDQYJKoZIhvcNAQEB
-# BQAEgYBYrsZ+qDLwpnoq8ocNdg6yAVMl7pyYx0ONnrUpjthzYw3OhKKgF8lcSbww
-# oU//cc+anGhdZNWly8gqbPMaWyCW+jz5uTSd+wq01m//VRYhV1OuSAJQiehOkShs
-# s1wHNJVvmVvfIHe8MbK02E9O8cJl85dQzdzjYR5yhkd/wTdEPA==
+# BgkqhkiG9w0BCQQxFgQUPjORYD+FrWpRycrTl8JYMQgfNd8wDQYJKoZIhvcNAQEB
+# BQAEgYCcw1tohzMOpS2Dl5o3tkTUCBw/8AZIaiH96aVUjuZuVuwzP+qWXMcmNfsq
+# PYxHF3Fj9utGGacohXnBMPOsIqptc0/b0BP/PTZlREPkOAAYfht7UN2n4WeK//7v
+# i0gskqq+1ccXkNRkliJZG/cWFvC4KPuW9DK6mbj/LNVEbjZkfg==
 # SIG # End signature block
