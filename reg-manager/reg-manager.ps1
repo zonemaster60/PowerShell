@@ -2,13 +2,17 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Some custom prompts reference $LASTEXITCODE; under StrictMode it may be unset until
+# the first native process runs. Initialize it so interactive Read-Host prompts don't error.
+$global:LASTEXITCODE = 0
+
 # =========================
 # Registry Backup/Restore UI
 # PowerShell 5.1
 # =========================
 
 $Script:ProgramVersion = '1.0.0.0'
-$Script:ProgramName = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { 'reg-backup.ps1' }
+$Script:ProgramName = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Leaf $MyInvocation.MyCommand.Path } else { 'reg-manager.ps1' }
 $Script:ProgramBaseName = [IO.Path]::GetFileNameWithoutExtension($Script:ProgramName)
 
 function Test-IsAdmin {
@@ -145,9 +149,8 @@ function Ensure-Folder([string]$Path) {
 
 
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
-    if (-not (Test-Path -LiteralPath $Path)) {
-        $null = New-Item -ItemType Directory -Path -LiteralPath $Path -Force
-    }
+    # New-Item does not support -LiteralPath; use .NET to avoid wildcard interpretation.
+    $null = [IO.Directory]::CreateDirectory($Path)
 }
 
 function Quote-CmdArg([string]$Value) {
@@ -782,7 +785,16 @@ function New-BackupSession([hashtable]$Config, [string]$Label) {
     if ($safeLabel -eq '') { $safeLabel = 'Backup' }
     $safeLabel = $safeLabel -replace '\s+', '_'
 
-    $folderName = "{0}_{1}_{2}" -f $ts, $env:COMPUTERNAME, $safeLabel
+    # Keep session folder names short to reduce MAX_PATH issues
+    $prefix = "{0}_{1}_" -f $ts, $env:COMPUTERNAME
+    $maxFolderNameLen = 80
+    $maxLabelLen = $maxFolderNameLen - $prefix.Length
+    if ($maxLabelLen -lt 12) { $maxLabelLen = 12 }
+    if ($safeLabel.Length -gt $maxLabelLen) {
+        $safeLabel = $safeLabel.Substring(0, $maxLabelLen)
+    }
+
+    $folderName = $prefix + $safeLabel
     $sessionPath = Join-Path $root $folderName
     Ensure-Folder $sessionPath
 
@@ -2007,8 +2019,8 @@ Main
 # SIG # Begin signature block
 # MIID4QYJKoZIhvcNAQcCoIID0jCCA84CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUmX8BLz9ydthzMmHzQTyN/mZq
-# WOagggH/MIIB+zCCAWSgAwIBAgIQK8KPnyZqh7ZLgu5QUg7L1TANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUgrIM3UpUUA1V73ilV/JRVqRp
+# VT6gggH/MIIB+zCCAWSgAwIBAgIQK8KPnyZqh7ZLgu5QUg7L1TANBgkqhkiG9w0B
 # AQUFADAYMRYwFAYDVQQDDA1EYXZpZCBTY291dGVuMB4XDTI2MDExNzE0MTcyM1oX
 # DTMwMDExNzAwMDAwMFowGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbjCBnzANBgkq
 # hkiG9w0BAQEFAAOBjQAwgYkCgYEAuixS48kf0xGGzx74Y45fjPFNwvOudmeITTBN
@@ -2022,8 +2034,8 @@ Main
 # MCwwGDEWMBQGA1UEAwwNRGF2aWQgU2NvdXRlbgIQK8KPnyZqh7ZLgu5QUg7L1TAJ
 # BgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAigAoAAoQKAADAZBgkqhkiG9w0B
 # CQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgELMQ4wDAYKKwYBBAGCNwIBFTAj
-# BgkqhkiG9w0BCQQxFgQUPjORYD+FrWpRycrTl8JYMQgfNd8wDQYJKoZIhvcNAQEB
-# BQAEgYCcw1tohzMOpS2Dl5o3tkTUCBw/8AZIaiH96aVUjuZuVuwzP+qWXMcmNfsq
-# PYxHF3Fj9utGGacohXnBMPOsIqptc0/b0BP/PTZlREPkOAAYfht7UN2n4WeK//7v
-# i0gskqq+1ccXkNRkliJZG/cWFvC4KPuW9DK6mbj/LNVEbjZkfg==
+# BgkqhkiG9w0BCQQxFgQUNqgcONTiXMMhimHdDGUfbyTXdG8wDQYJKoZIhvcNAQEB
+# BQAEgYAoQFyDY82Q1U15Ns8F+CJj35DwGHv5DHrj7kl9o/i6ISZ7ovBZMPd8oYU5
+# RFIBEymCGHsYQUY68NbX2mQiOFLnpSXmIEeHvyKqvy+pNsh7kWcSKGFr1DVG7+d4
+# aOItMHhietGUBhQxi6grLKJJve/LJfvke1rHcAXDkPKwFE3VUA==
 # SIG # End signature block
